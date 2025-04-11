@@ -1,0 +1,2 @@
+2025-04-11T21:25:52.136Z	INFO	instance/beat.go:698	Home path: [/usr/share/filebeat] Config path: [/etc/filebeat] Data path: [/var/lib/filebeat] Logs path: [/var/log/filebeat] Hostfs Path: [/]
+2025-04-11T21:25:52.151Z	INFO	instance/beat.go:706	Beat ID: 5a97b9ec-5e91-4f80-8d30-5c7d567893ac

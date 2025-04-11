@@ -1,0 +1,22 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/apache2/access.log
+    - /var/log/apache2/error.log
+    - /var/log/auth.log
+
+- type: system
+  enabled: true
+
+filebeat.config.modules:
+  path: \/modules.d/*.yml
+  reload.enabled: false
+
+setup.kibana:
+  host: "kibana:5601"
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info

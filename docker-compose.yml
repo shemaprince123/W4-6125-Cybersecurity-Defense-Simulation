@@ -1,0 +1,110 @@
+version: '3'
+
+networks:
+  internal_network:
+    driver: bridge
+  external_network:
+    driver: bridge
+
+services:
+  # Target server (victim)
+  target:
+    image: ubuntu:20.04
+    container_name: target
+    networks:
+      - internal_network
+    ports:
+      - "80:80"
+      - "22:22"
+    volumes:
+      - ./target/start.sh:/start.sh
+      - ./target/logs:/var/log
+    command: bash -c "chmod +x /start.sh && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y apache2 openssh-server php libapache2-mod-php && /start.sh"
+    restart: unless-stopped
+
+
+  # Attacker machine with Kali tools
+  kali:
+    image: kalilinux/kali-rolling
+    container_name: kali
+    networks:
+      - external_network
+      - internal_network
+    volumes:
+      - ./kali/tools:/root/tools
+      - ./kali/data:/root/data
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+    command: bash -c "apt-get update && apt-get install -y nmap metasploit-framework wireshark tshark snort && /bin/bash"
+
+  # ELK Stack for logging
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    networks:
+      - internal_network
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./elk/elasticsearch/data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.13.0
+    container_name: logstash
+    networks:
+      - internal_network
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./elk/logstash/config:/usr/share/logstash/config
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.13.0
+    container_name: kibana
+    networks:
+      - internal_network
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    
+  # IDS system
+  ids:
+    build: ./ids
+    container_name: ids
+    networks:
+      - internal_network
+    volumes:
+      - ./ids/config:/etc/snort
+      - ./ids/logs:/var/log/snort
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: unless-stopped
+    
+  # Firewall
+  firewall:
+    build: ./firewall
+    container_name: firewall
+    networks:
+      - internal_network
+      - external_network
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./firewall/rules:/etc/iptables
+      - ./firewall/logs:/var/log
+    restart: unless-stopped
